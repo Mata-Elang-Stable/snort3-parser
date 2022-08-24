@@ -15,17 +15,6 @@ var connectionLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, 
 	log.Printf("Connection Lost: %s\n", err.Error())
 }
 
-func getMQTTClient(options *mqtt.ClientOptions) mqtt.Client {
-	client := mqtt.NewClient(options)
-	token := client.Connect()
-
-	if token.Wait() && token.Error() != nil {
-		panic(token.Error())
-	}
-
-	return client
-}
-
 func main() {
 	var broker = "tcp://192.168.1.121:1883"
 
@@ -37,7 +26,12 @@ func main() {
 	options.OnConnect = connectHandler
 	options.OnConnectionLost = connectionLostHandler
 
-	client := getMQTTClient(options)
+	client := mqtt.NewClient(options)
+	token := client.Connect()
+
+	if token.Wait() && token.Error() != nil {
+		panic(token.Error())
+	}
 
 	topic := default_topic
 
@@ -55,7 +49,6 @@ func main() {
 
 	// Create routine for sending message from messages channel
 	go func() {
-		var token = nil;
 		for textLine := range messages {
 			log.Printf("Sending snort log... ")
 			token = client.Publish(topic, 0, false, textLine)
