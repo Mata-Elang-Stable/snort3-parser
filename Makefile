@@ -17,7 +17,7 @@ build: vendor build-linux ## Build the project and put the output binary in out/
 build-linux:
 	@- $(foreach arch, $(TARGET_ARCH), \
 		echo "Compiling for $(arch)"; \
-		GOOS=linux GOARCH=$${arch} GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-$${arch} . ;\
+		GOOS=linux GOARCH=$(arch) GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-$(arch) . ;\
 	)
 
 
