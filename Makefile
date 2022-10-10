@@ -10,24 +10,26 @@ WHITE  := $(shell tput -Txterm setaf 7)
 CYAN   := $(shell tput -Txterm setaf 6)
 RESET  := $(shell tput -Txterm sgr0)
 
-build: build-linux ## Build the project and put the output binary in out/bin/
-	mkdir -p out/bin
-	echo "Compiling snort-parser"
+build: vendor build-linux ## Build the project and put the output binary in out/bin/
 
 build-linux:
-	for arch in {386,amd64,arm64}; do\
-		GOOS=linux GOARCH=$${arch} GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-$${arch} . ;\
-	done
+	@echo "Compiling for i386"
+	@ GOOS=linux GOARCH=386 GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-i386 .
+	@echo "Compiling for amd64"
+	@ GOOS=linux GOARCH=amd64 GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-amd64 .
+	@echo "Compiling for arm64"
+	@ GOOS=linux GOARCH=arm64 GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-arm64 .
 
 clean: ## Remove build related file
-	rm -rf ./bin
-	rm -rf ./out
+	@rm -rf ./bin
+	@rm -rf ./out
+	@echo "Any build output removed."
 
 vendor: ## Copy of all packages needed to support builds in the vendor directory
-	$(GOCMD) mod vendor
+	@ $(GOCMD) mod vendor
 
 run: ## Run with go run
-	go run main.go
+	@go run main.go
 
 help: ## Show this help.
 	@echo ''
