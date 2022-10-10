@@ -17,6 +17,8 @@ build-linux:
 	@ GOOS=linux GOARCH=386 GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-i386 .
 	@echo "Compiling for amd64"
 	@ GOOS=linux GOARCH=amd64 GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-amd64 .
+	@echo "Compiling for arm (32-bit)"
+	@ GOOS=linux GOARCH=arm GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-arm .
 	@echo "Compiling for arm64"
 	@ GOOS=linux GOARCH=arm64 GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-arm64 .
 
