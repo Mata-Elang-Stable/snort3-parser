@@ -1,8 +1,10 @@
+SHELL:=bash
 GOCMD=go
 GOTEST=$(GOCMD) test
 GOVET=$(GOCMD) vet
 BINARY_NAME=me-snort-parser
 VERSION?=1.1
+TARGET_ARCH=386 arm amd64 arm64
 
 GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
@@ -13,12 +15,11 @@ RESET  := $(shell tput -Txterm sgr0)
 build: vendor build-linux ## Build the project and put the output binary in out/bin/
 
 build-linux:
-	@echo "Compiling for i386"
-	@ GOOS=linux GOARCH=386 GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-i386 .
-	@echo "Compiling for amd64"
-	@ GOOS=linux GOARCH=amd64 GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-amd64 .
-	@echo "Compiling for arm64"
-	@ GOOS=linux GOARCH=arm64 GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-arm64 .
+	@- $(foreach arch, $(TARGET_ARCH), \
+		echo "Compiling for $(arch)"; \
+		GOOS=linux GOARCH=$${arch} GO111MODULE=on $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-$${arch} . ;\
+	)
+
 
 clean: ## Remove build related file
 	@rm -rf ./bin
