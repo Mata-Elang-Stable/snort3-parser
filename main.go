@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -20,10 +21,12 @@ const usage = `Usage of Snort3 Parser:
     Show this usage
  -f, --snort-alert-file
     Snort v3 JSON Log Alert File Path
- -h, --mqtt-host
+ -H, --mqtt-host
     MQTT Broker Host (default: localhost)
- -p, --mqtt-port
+ -P, --mqtt-port
     MQTT Broker Port (default: 1883)
+ -s, --id
+    Sensor ID (default: machine-id)
  -t, --topic
     MQTT Topic to send data into (default: mataelang/sensor/v3/<machine-id>)
 `
@@ -47,6 +50,7 @@ func main() {
 		mqttBrokerPort     string
 		mqttTopic          string
 		snortAlertFilePath string
+		sensorID           string
 		errorCount         = 0
 		successCount       = 0
 		messageCount       = 0
@@ -56,6 +60,8 @@ func main() {
 	flag.StringVar(&mqttBrokerHost, "H", "127.0.0.1", "MQTT Broker Host")
 	flag.StringVar(&mqttBrokerPort, "port", "1883", "MQTT Broker Port")
 	flag.StringVar(&mqttBrokerPort, "P", "1883", "MQTT Broker Port")
+	flag.StringVar(&sensorID, "s", machineID, "Sensor ID")
+	flag.StringVar(&sensorID, "id", machineID, "Sensor ID")
 	flag.StringVar(&mqttTopic, "topic", "mataelang/sensor/v3/<machine-id>", "MQTT Broker Topic")
 	flag.StringVar(&mqttTopic, "t", "mataelang/sensor/v3/<machine-id>", "MQTT Broker Topic")
 	flag.StringVar(&snortAlertFilePath, "snort-alert-path", "", "Snort v3 JSON Log Alert File Path")
@@ -99,7 +105,7 @@ func main() {
 		log.Fatalln(token.Error())
 	}
 
-	messages := make(chan string)
+	messages := make(chan map[string]interface{})
 
 	// Create a tail process
 	t, err := tail.TailFile(
@@ -113,7 +119,11 @@ func main() {
 		for textLine := range messages {
 			messageCount += 1
 			log.Printf("Sending snort log... ")
-			token = client.Publish(mqttTopic, 0, false, textLine)
+			payload, err := json.Marshal(textLine)
+			if err != nil {
+				log.Println(err)
+			}
+			token = client.Publish(mqttTopic, 0, false, payload)
 			if token.Wait() && token.Error() != nil {
 				errorCount += 1
 				continue
@@ -139,6 +149,14 @@ func main() {
 
 	// Send the message to channel
 	for line := range t.Lines {
-		messages <- line.Text
+		var payload map[string]interface{}
+		err = json.Unmarshal([]byte(line.Text), &payload)
+		if err != nil {
+			log.Printf("ERROR - Cannot parse event log")
+			continue
+		}
+		payload["sensor_id"] = sensorID
+		log.Println(payload)
+		messages <- payload
 	}
 }
