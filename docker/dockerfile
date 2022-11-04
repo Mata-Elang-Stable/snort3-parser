@@ -18,4 +18,4 @@ FROM scratch
 
 COPY --from=build /app/me-snor3-parser /app/me-snor3-parser
 
-ENTRYPOINT [ "/app/me-snor3-parser" ]
+CMD [ "/app/me-snor3-parser", "-b" ]

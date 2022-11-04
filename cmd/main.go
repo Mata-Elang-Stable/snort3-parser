@@ -38,6 +38,7 @@ func main() {
 		snortAlertFilePath string
 		sensorID           string
 		mqttClientID       string
+		noCLI              = false
 		errorCount         = 0
 		successCount       = 0
 		messageCount       = 0
@@ -47,11 +48,33 @@ func main() {
 	flag.Var(internal.PortVar(&mqttBrokerPort), "P", "MQTT Broker Port")
 	flag.StringVar(&sensorID, "s", "<machine-id>", "Sensor ID")
 	flag.StringVar(&mqttTopic, "t", "mataelang/sensor/v3/<machine-id>", "MQTT Broker Topic")
-	flag.StringVar(&snortAlertFilePath, "f", "", "Snort v3 JSON Log Alert File Path")
+	flag.StringVar(&snortAlertFilePath, "f", "/var/log/snort/alert_json.txt", "Snort v3 JSON Log Alert File Path")
+	flag.BoolVar(&noCLI, "b", true, "Wheter to use flag or environment variable")
 	flag.Usage = func() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+
+	if noCLI {
+		snortAlertFilePath = os.Getenv("SNORT_ALERT_FILE_PATH")
+		if snortAlertFilePath == "" {
+			snortAlertFilePath = "/var/log/snort/alert_json.txt"
+		}
+		mqttBrokerHost = os.Getenv("MQTT_HOST")
+		mqttBrokerPort, err = strconv.Atoi(os.Getenv("MQTT_PORT"))
+		if err != nil {
+			mqttBrokerPort = 1883
+		}
+		mqttTopic = os.Getenv("MQTT_TOPIC")
+		if mqttTopic == "" {
+			mqttTopic = "mataelang/sensor/v3/<machine-id>"
+		}
+		
+		sensorID = os.Getenv("SENSOR_ID")
+		if sensorID == "" {
+			sensorID = "<machine-id>"
+		}
+	}
 
 	if snortAlertFilePath == "" {
 		fmt.Printf("snort-alert-path cannot be null. Check the required parameter. Exiting.\n\n")
