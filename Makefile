@@ -4,8 +4,12 @@ GOTEST=$(GOCMD) test
 GOVET=$(GOCMD) vet
 BINARY_NAME=me-snort-parser
 VERSION?=1.1
-TARGET_ARCH=386 arm amd64 arm64
+TARGET_PLATFORMS=linux/386 linux/arm linux/amd64 linux/arm64
+DOCKER_REPO_URL=mfscy/snort3-parser
 
+comma:= ,
+empty:=
+space:= $(empty) $(empty)
 GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
 WHITE  := $(shell tput -Txterm setaf 7)
@@ -15,11 +19,14 @@ RESET  := $(shell tput -Txterm sgr0)
 build: vendor build-linux ## Build the project and put the output binary in out/bin/
 
 build-linux:
-	@- $(foreach arch, $(TARGET_ARCH), \
-		echo "Compiling for $(arch)"; \
-		GOOS=linux GOARCH=$(arch) GO111MODULE=on CGO_ENABLED=0 $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-linux-$(arch) . ;\
+	@$(foreach platform, $(TARGET_PLATFORMS), \
+		echo "Compiling for $(platform)"; \
+		GOOS=$(word 1,$(subst /, ,$(platform))) GOARCH=$(word 2,$(subst /, ,$(platform))) GO111MODULE=on CGO_ENABLED=0 $(GOCMD) build -mod vendor -o out/bin/$(BINARY_NAME)-$(word 1,$(subst /, ,$(platform)))-$(word 2,$(subst /, ,$(platform))) ./cmd/ ;\
 	)
-
+	
+build-docker-multiarch:
+	@echo "Building docker image for platform: $(TARGET_PLATFORMS)"
+	@docker buildx build --platform $(subst $(space),$(comma),$(TARGET_PLATFORMS)) -t $(DOCKER_REPO_URL) -f docker/dockerfile --push .
 
 clean: ## Remove build related file
 	@rm -rf ./bin

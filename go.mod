@@ -1,4 +1,4 @@
-module main
+module github.com/mata-elang-stable/snort3-parser
 
 go 1.18
 

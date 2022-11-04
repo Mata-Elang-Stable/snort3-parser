@@ -13,23 +13,9 @@ import (
 
 	"github.com/denisbrodbeck/machineid"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/mata-elang-stable/snort3-parser/internal"
 	"github.com/nxadm/tail"
 )
-
-const usage = `Usage of Snort3 Parser:
- -h, --help
-    Show this usage
- -f, --snort-alert-file
-    Snort v3 JSON Log Alert File Path
- -H, --mqtt-host
-    MQTT Broker Host (default: localhost)
- -P, --mqtt-port
-    MQTT Broker Port (default: 1883)
- -s, --id
-    Sensor ID (default: machine-id)
- -t, --topic
-    MQTT Topic to send data into (default: mataelang/sensor/v3/<machine-id>)
-`
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
 	log.Println("MQTT Client Connected.")
@@ -47,26 +33,24 @@ func main() {
 	}
 	var (
 		mqttBrokerHost     string
-		mqttBrokerPort     string
+		mqttBrokerPort     int
 		mqttTopic          string
 		snortAlertFilePath string
 		sensorID           string
+		mqttClientID       string
 		errorCount         = 0
 		successCount       = 0
 		messageCount       = 0
 	)
 
-	flag.StringVar(&mqttBrokerHost, "host", "127.0.0.1", "MQTT Broker Host")
 	flag.StringVar(&mqttBrokerHost, "H", "127.0.0.1", "MQTT Broker Host")
-	flag.StringVar(&mqttBrokerPort, "port", "1883", "MQTT Broker Port")
-	flag.StringVar(&mqttBrokerPort, "P", "1883", "MQTT Broker Port")
-	flag.StringVar(&sensorID, "s", machineID, "Sensor ID")
-	flag.StringVar(&sensorID, "id", machineID, "Sensor ID")
-	flag.StringVar(&mqttTopic, "topic", "mataelang/sensor/v3/<machine-id>", "MQTT Broker Topic")
+	flag.Var(internal.PortVar(&mqttBrokerPort), "P", "MQTT Broker Port")
+	flag.StringVar(&sensorID, "s", "<machine-id>", "Sensor ID")
 	flag.StringVar(&mqttTopic, "t", "mataelang/sensor/v3/<machine-id>", "MQTT Broker Topic")
-	flag.StringVar(&snortAlertFilePath, "snort-alert-path", "", "Snort v3 JSON Log Alert File Path")
 	flag.StringVar(&snortAlertFilePath, "f", "", "Snort v3 JSON Log Alert File Path")
-	flag.Usage = func() { fmt.Print(usage) }
+	flag.Usage = func() {
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
 	if snortAlertFilePath == "" {
@@ -76,25 +60,26 @@ func main() {
 	}
 
 	mqttTopic = strings.ReplaceAll(mqttTopic, "<machine-id>", machineID)
+	sensorID = strings.ReplaceAll(sensorID, "<machine-id>", machineID)
+	mqttClientID = fmt.Sprintf("mataelang_sensor_snort_v3_%s", machineID)
 
-	log.Println("MQTT Broker Host\t: " + mqttBrokerHost)
-	log.Println("MQTT Broker Port\t: " + mqttBrokerPort)
-	log.Println("MQTT Broker Topic\t: " + mqttTopic)
+	log.Printf("MQTT Broker Host\t: %s\n", mqttBrokerHost)
+	log.Printf("MQTT Broker Port\t: %d\n", mqttBrokerPort)
+	log.Printf("MQTT Broker Topic\t: %s\n", mqttTopic)
+	log.Printf("Snort Alert File Path\t: %s\n", snortAlertFilePath)
 
-	log.Println("Snort Alert File Path\t: " + snortAlertFilePath)
-
-	log.Print("Checking snort alert file is exist...")
+	log.Printf("Checking snort alert file is exist...\n")
 	if _, err := os.Stat(snortAlertFilePath); errors.Is(err, os.ErrNotExist) {
-		log.Println("\nSnort alert file at " + snortAlertFilePath + ", does not exist.")
+		log.Printf("\nSnort alert file at %s, does not exist.\n", snortAlertFilePath)
 		log.Fatalln("Cannot continue, exiting.")
 	}
-	log.Println("\tOk, found.")
+	log.Printf("Snort alert file exist.\n")
 
-	var broker = "tcp://" + mqttBrokerHost + ":" + mqttBrokerPort
+	var broker = fmt.Sprintf("tcp://%s:%d", mqttBrokerHost, mqttBrokerPort)
 
 	options := mqtt.NewClientOptions()
 	options.AddBroker(broker)
-	options.SetClientID("mataelang_sensor_snort_v3_" + machineID)
+	options.SetClientID(mqttClientID)
 	options.OnConnect = connectHandler
 	options.OnConnectionLost = connectionLostHandler
 
