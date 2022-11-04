@@ -147,7 +147,7 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				log.Println("Total=" + strconv.Itoa(messageCount) + "\tSuccess=" + strconv.Itoa(successCount) + "\tFailed=" + strconv.Itoa(errorCount) + "\tError Rate=" + strconv.Itoa((errorCount/messageCount)*100) + "%")
+				log.Printf("Total=%d\tSuccess=%d\tFailed=%d\n", messageCount, successCount, errorCount)
 			case <-quit:
 				ticker.Stop()
 				return
