@@ -69,6 +69,10 @@ func main() {
 		if err != nil {
 			mqttBrokerPort = 1883
 		}
+
+		mqttBrokerUsername = os.Getenv("MQTT_USERNAME")
+		mqttBrokerPassword = os.Getenv("MQTT_PASSWORD")
+
 		mqttTopic = os.Getenv("MQTT_TOPIC")
 		if mqttTopic == "" {
 			mqttTopic = "mataelang/sensor/v3/<machine-id>"
