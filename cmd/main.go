@@ -34,6 +34,8 @@ func main() {
 	var (
 		mqttBrokerHost     string
 		mqttBrokerPort     int
+		mqttBrokerUsername string
+		mqttBrokerPassword string
 		mqttTopic          string
 		snortAlertFilePath string
 		sensorID           string
@@ -46,10 +48,12 @@ func main() {
 
 	flag.StringVar(&mqttBrokerHost, "H", "127.0.0.1", "MQTT Broker Host")
 	flag.Var(internal.PortVar(&mqttBrokerPort), "P", "MQTT Broker Port")
+	flag.StringVar(&mqttBrokerUsername, "u", "", "MQTT Broker Username")
+	flag.StringVar(&mqttBrokerPassword, "p", "", "MQTT Broker Password")
 	flag.StringVar(&sensorID, "s", "<machine-id>", "Sensor ID")
 	flag.StringVar(&mqttTopic, "t", "mataelang/sensor/v3/<machine-id>", "MQTT Broker Topic")
 	flag.StringVar(&snortAlertFilePath, "f", "/var/log/snort/alert_json.txt", "Snort v3 JSON Log Alert File Path")
-	flag.BoolVar(&noCLI, "b", true, "Wheter to use flag or environment variable")
+	flag.BoolVar(&noCLI, "b", false, "Wheter to use flag or environment variable")
 	flag.Usage = func() {
 		flag.PrintDefaults()
 	}
@@ -103,6 +107,10 @@ func main() {
 	options := mqtt.NewClientOptions()
 	options.AddBroker(broker)
 	options.SetClientID(mqttClientID)
+	if mqttBrokerUsername != "" {
+		options.SetUsername(mqttBrokerUsername)
+		options.SetPassword(mqttBrokerPassword)
+	}
 	options.OnConnect = connectHandler
 	options.OnConnectionLost = connectionLostHandler
 
