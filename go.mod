@@ -6,6 +6,7 @@ require (
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/eclipse/paho.mqtt.golang v1.4.1
 	github.com/nxadm/tail v1.4.8
+	golang.org/x/text v0.3.0
 )
 
 require (
