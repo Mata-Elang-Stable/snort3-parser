@@ -104,12 +104,13 @@ func main() {
 
 	log.Printf("Loading configuration.")
 
-	mqttTopic = strings.ReplaceAll(mqttTopic, "<machine-id>", machineID)
 	sensorID = strings.ReplaceAll(sensorID, "<machine-id>", machineID)
+	mqttTopic = strings.ReplaceAll(mqttTopic, "<machine-id>", machineID)
+	mqttTopic = strings.ReplaceAll(mqttTopic, "<sensor-id>", sensorID)
 	mqttClientID = fmt.Sprintf("mataelang_sensor_parser_v3_%s", appID)
 
-	log.Printf("MQTT Broker Host\t: %s\n", mqttBrokerHost)
-	log.Printf("MQTT Broker Port\t: %d\n", mqttBrokerPort)
+	log.Printf("MQTT Broker Host\t\t: %s\n", mqttBrokerHost)
+	log.Printf("MQTT Broker Port\t\t: %d\n", mqttBrokerPort)
 	log.Printf("MQTT Broker Topic\t: %s\n", mqttTopic)
 	log.Printf("Snort Alert Path\t: %s\n", snortAlertFilePath)
 
@@ -162,8 +163,10 @@ func main() {
 			}
 			k := client.Publish(mqttTopic, 0, true, payload)
 			if k.Wait() && k.Error() != nil {
-				successCount += 1
+				log.Println(k.Error())
+				continue
 			}
+			successCount += 1
 		}
 	}()
 
