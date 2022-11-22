@@ -17,6 +17,7 @@ import (
 	"github.com/nxadm/tail"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
+	"github.com/google/uuid"
 )
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
@@ -33,6 +34,8 @@ func main() {
 		log.Println("Cannot get machine unique ID")
 		machineID = "anonymous"
 	}
+	appID := uuid.New()
+
 	var (
 		mqttBrokerHost     string
 		mqttBrokerPort     int
@@ -50,7 +53,7 @@ func main() {
 	)
 
 	flag.StringVar(&mqttBrokerHost, "H", "127.0.0.1", "MQTT Broker Host")
-	flag.Var(internal.PortVar(&mqttBrokerPort), "P", "MQTT Broker Port")
+	flag.IntVar(&mqttBrokerPort, "P", 1883, "MQTT Broker Port")
 	flag.StringVar(&mqttBrokerUsername, "u", "", "MQTT Broker Username")
 	flag.StringVar(&mqttBrokerPassword, "p", "", "MQTT Broker Password")
 	flag.StringVar(&sensorID, "s", "<machine-id>", "Sensor ID")
@@ -89,8 +92,12 @@ func main() {
 		}
 	}
 
+	if _, err := internal.ValidatePort(mqttBrokerPort); err != nil {
+		log.Fatal(err)
+	}
+
 	if snortAlertFilePath == "" {
-		fmt.Printf("snort-alert-path cannot be null. Check the required parameter. Exiting.\n\n")
+		log.Printf("Snort Alert Path cannot be null. Exiting.\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -99,7 +106,7 @@ func main() {
 
 	mqttTopic = strings.ReplaceAll(mqttTopic, "<machine-id>", machineID)
 	sensorID = strings.ReplaceAll(sensorID, "<machine-id>", machineID)
-	mqttClientID = fmt.Sprintf("mataelang_sensor_snort_v3_%s", machineID)
+	mqttClientID = fmt.Sprintf("mataelang_sensor_parser_v3_%s", appID)
 
 	log.Printf("MQTT Broker Host\t: %s\n", mqttBrokerHost)
 	log.Printf("MQTT Broker Port\t: %d\n", mqttBrokerPort)
