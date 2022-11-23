@@ -15,6 +15,9 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/mata-elang-stable/snort3-parser/internal"
 	"github.com/nxadm/tail"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+	"github.com/google/uuid"
 )
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
@@ -31,6 +34,8 @@ func main() {
 		log.Println("Cannot get machine unique ID")
 		machineID = "anonymous"
 	}
+	appID := uuid.New()
+
 	var (
 		mqttBrokerHost     string
 		mqttBrokerPort     int
@@ -41,19 +46,22 @@ func main() {
 		sensorID           string
 		mqttClientID       string
 		noCLI              = false
-		errorCount         = 0
+		verboseLog         = false
 		successCount       = 0
 		messageCount       = 0
+		statsIntervalSec   = 10
 	)
 
 	flag.StringVar(&mqttBrokerHost, "H", "127.0.0.1", "MQTT Broker Host")
-	flag.Var(internal.PortVar(&mqttBrokerPort), "P", "MQTT Broker Port")
+	flag.IntVar(&mqttBrokerPort, "P", 1883, "MQTT Broker Port")
 	flag.StringVar(&mqttBrokerUsername, "u", "", "MQTT Broker Username")
 	flag.StringVar(&mqttBrokerPassword, "p", "", "MQTT Broker Password")
 	flag.StringVar(&sensorID, "s", "<machine-id>", "Sensor ID")
 	flag.StringVar(&mqttTopic, "t", "mataelang/sensor/v3/<machine-id>", "MQTT Broker Topic")
 	flag.StringVar(&snortAlertFilePath, "f", "/var/log/snort/alert_json.txt", "Snort v3 JSON Log Alert File Path")
 	flag.BoolVar(&noCLI, "b", false, "Wheter to use flag or environment variable")
+	flag.BoolVar(&verboseLog, "v", false, "Verbose payload to stdout")
+	flag.IntVar(&statsIntervalSec, "d", 10, "Log Statistics interval in second")
 	flag.Usage = func() {
 		flag.PrintDefaults()
 	}
@@ -77,27 +85,34 @@ func main() {
 		if mqttTopic == "" {
 			mqttTopic = "mataelang/sensor/v3/<machine-id>"
 		}
-		
+
 		sensorID = os.Getenv("SENSOR_ID")
 		if sensorID == "" {
 			sensorID = "<machine-id>"
 		}
 	}
 
+	if _, err := internal.ValidatePort(mqttBrokerPort); err != nil {
+		log.Fatal(err)
+	}
+
 	if snortAlertFilePath == "" {
-		fmt.Printf("snort-alert-path cannot be null. Check the required parameter. Exiting.\n\n")
+		log.Printf("Snort Alert Path cannot be null. Exiting.\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	mqttTopic = strings.ReplaceAll(mqttTopic, "<machine-id>", machineID)
-	sensorID = strings.ReplaceAll(sensorID, "<machine-id>", machineID)
-	mqttClientID = fmt.Sprintf("mataelang_sensor_snort_v3_%s", machineID)
+	log.Printf("Loading configuration.")
 
-	log.Printf("MQTT Broker Host\t: %s\n", mqttBrokerHost)
-	log.Printf("MQTT Broker Port\t: %d\n", mqttBrokerPort)
+	sensorID = strings.ReplaceAll(sensorID, "<machine-id>", machineID)
+	mqttTopic = strings.ReplaceAll(mqttTopic, "<machine-id>", machineID)
+	mqttTopic = strings.ReplaceAll(mqttTopic, "<sensor-id>", sensorID)
+	mqttClientID = fmt.Sprintf("mataelang_sensor_parser_v3_%s", appID)
+
+	log.Printf("MQTT Broker Host\t\t: %s\n", mqttBrokerHost)
+	log.Printf("MQTT Broker Port\t\t: %d\n", mqttBrokerPort)
 	log.Printf("MQTT Broker Topic\t: %s\n", mqttTopic)
-	log.Printf("Snort Alert File Path\t: %s\n", snortAlertFilePath)
+	log.Printf("Snort Alert Path\t: %s\n", snortAlertFilePath)
 
 	log.Printf("Checking snort alert file is exist...\n")
 	if _, err := os.Stat(snortAlertFilePath); errors.Is(err, os.ErrNotExist) {
@@ -134,32 +149,40 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	log.Printf("Start sending logs.")
+
+	p := message.NewPrinter(language.AmericanEnglish)
+
 	// Create routine for sending message from messages channel
 	go func() {
 		for textLine := range messages {
 			messageCount += 1
-			log.Printf("Sending snort log... ")
 			payload, err := json.Marshal(textLine)
 			if err != nil {
 				log.Println(err)
 			}
-			token = client.Publish(mqttTopic, 0, false, payload)
-			if token.Wait() && token.Error() != nil {
-				errorCount += 1
+			k := client.Publish(mqttTopic, 0, true, payload)
+			if k.Wait() && k.Error() != nil {
+				log.Println(k.Error())
 				continue
 			}
-			fmt.Printf("[ok]\n")
 			successCount += 1
 		}
 	}()
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(time.Duration(statsIntervalSec) * time.Second)
 	quit := make(chan struct{})
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				log.Printf("Total=%d\tSuccess=%d\tFailed=%d\n", messageCount, successCount, errorCount)
+				tempMessageCount := messageCount
+				tempSuccessCount := successCount
+				messageCount = 0
+				successCount = 0
+				tempErrorCount := tempMessageCount - tempSuccessCount
+				tempMessageRate := tempMessageCount / statsIntervalSec
+				log.Printf("Total=%d\tSuccess=%d\tFailed=%d\tAvgRate=%s message/second\n", tempMessageCount, tempSuccessCount, tempErrorCount, p.Sprintf("%v", tempMessageRate))
 			case <-quit:
 				ticker.Stop()
 				return
@@ -176,7 +199,11 @@ func main() {
 			continue
 		}
 		payload["sensor_id"] = sensorID
-		log.Println(payload)
+
+		if verboseLog {
+			log.Printf("PAYLOAD - %s\n", fmt.Sprint(payload))
+		}
+
 		messages <- payload
 	}
 }
