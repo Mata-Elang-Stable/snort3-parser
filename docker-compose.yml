@@ -1,0 +1,16 @@
+# docker run -d -it -p 10.87.100.9:1881:1880 -v /home/trustmedis/node_red2:/data --name node-red2 -e TZ=Asia/Jakarta nodered/node-red:latest
+
+version: "3.4"
+
+services:
+  node-red2:
+    image: nodered/node-red:latest
+    container_name: node-red2
+    environment:
+      TZ: Asia/Jakarta
+    volumes:
+      - /home/trustmedis/node_red2:/data
+    ports:
+      - 10.87.100.9:1881:1880
+      
+

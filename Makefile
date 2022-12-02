@@ -16,25 +16,33 @@ WHITE  := $(shell tput -Txterm setaf 7)
 CYAN   := $(shell tput -Txterm setaf 6)
 RESET  := $(shell tput -Txterm sgr0)
 
-build: vendor build-linux ## Build the project and put the output binary in out/bin/
+build: go-tidy build-linux ## Build the project and put the output binary in out/bin/
 
 build-linux:
 	@$(foreach platform, $(TARGET_PLATFORMS), \
-		echo "Compiling for $(platform)"; \
+		echo "[INFO] Compiling for $(platform)"; \
 		GOOS=$(word 1,$(subst /, ,$(platform))) GOARCH=$(word 2,$(subst /, ,$(platform))) GO111MODULE=on CGO_ENABLED=0 $(GOCMD) build -o out/bin/$(BINARY_NAME)-$(word 1,$(subst /, ,$(platform)))-$(word 2,$(subst /, ,$(platform))) ./cmd/ ;\
 	)
 	
 build-docker-multiarch:
-	@echo "Building docker image for platform: $(TARGET_PLATFORMS)"
-	@docker buildx build --platform $(subst $(space),$(comma),$(TARGET_PLATFORMS)) -t $(DOCKER_REPO_URL) -f docker/dockerfile --push .
+	@echo "[INFO] Building docker image for platform: $(TARGET_PLATFORMS)"
+	@docker buildx build --platform $(subst $(space),$(comma),$(TARGET_PLATFORMS)) -t $(DOCKER_REPO_URL) --push .
+
+build-docker:
+	@echo "[INFO] Building docker image"
+	@echo "[INFO] Docker image name: snort3-parser"
+	@docker build -t snort3-parser .
 
 clean: ## Remove build related file
 	@rm -rf ./bin
 	@rm -rf ./out
-	@echo "Any build output removed."
+	@echo "[INFO] Any build output removed."
 
 vendor: ## Copy of all packages needed to support builds in the vendor directory
 	@ $(GOCMD) mod vendor
+
+go-tidy:
+	@$(GOCMD) mod tidy
 
 run: ## Run with go run
 	@go run main.go
