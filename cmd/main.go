@@ -7,17 +7,18 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/denisbrodbeck/machineid"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/google/uuid"
 	"github.com/mata-elang-stable/snort3-parser/internal"
 	"github.com/nxadm/tail"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
-	"github.com/google/uuid"
 )
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
@@ -171,7 +172,10 @@ func main() {
 	}()
 
 	ticker := time.NewTicker(time.Duration(statsIntervalSec) * time.Second)
+	tickerLog := time.NewTicker(time.Duration(10) * time.Second)
+
 	quit := make(chan struct{})
+
 	go func() {
 		for {
 			select {
@@ -183,6 +187,19 @@ func main() {
 				tempErrorCount := tempMessageCount - tempSuccessCount
 				tempMessageRate := tempMessageCount / statsIntervalSec
 				log.Printf("Total=%d\tSuccess=%d\tFailed=%d\tAvgRate=%s message/second\n", tempMessageCount, tempSuccessCount, tempErrorCount, p.Sprintf("%v", tempMessageRate))
+			case <-tickerLog.C:
+				files, err := filepath.Glob(fmt.Sprintf("%s.*", snortAlertFilePath))
+				if err != nil {
+					log.Printf("[INFO] No rotated log file found.")
+					continue
+				}
+				for _, f := range files {
+					if err := os.Remove(f); err != nil {
+						log.Printf("[WARN] Cannot remove %s file", f)
+						continue
+					}
+					log.Printf("[INFO] File %s is removed.", f)
+				}
 			case <-quit:
 				ticker.Stop()
 				return
