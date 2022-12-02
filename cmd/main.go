@@ -172,7 +172,7 @@ func main() {
 	}()
 
 	ticker := time.NewTicker(time.Duration(statsIntervalSec) * time.Second)
-	tickerLog := time.NewTicker(time.Duration(10) * time.Second)
+	tickerLog := time.NewTicker(time.Duration(60) * time.Second)
 
 	quit := make(chan struct{})
 
