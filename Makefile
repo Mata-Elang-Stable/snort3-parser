@@ -5,7 +5,7 @@ GOVET=$(GOCMD) vet
 BINARY_NAME=me-snort-parser
 VERSION?=1.1
 TARGET_PLATFORMS=linux/386 linux/arm linux/amd64 linux/arm64
-DOCKER_REPO_URL=mfscy/snort3-parser
+DOCKER_REPO_URL=mataelang/snort3-parser
 
 comma:= ,
 empty:=
@@ -26,7 +26,7 @@ build-linux:
 	
 build-docker-multiarch:
 	@echo "[INFO] Building docker image for platform: $(TARGET_PLATFORMS)"
-	@docker buildx build --platform $(subst $(space),$(comma),$(TARGET_PLATFORMS)) -t $(DOCKER_REPO_URL) --push .
+	@docker buildx build --platform $(subst $(space),$(comma),$(TARGET_PLATFORMS)) -t $(DOCKER_REPO_URL):latest -t $(DOCKER_REPO_URL):$(VERSION) --push .
 
 build-docker:
 	@echo "[INFO] Building docker image"
