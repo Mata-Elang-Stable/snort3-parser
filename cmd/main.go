@@ -14,6 +14,7 @@ import (
 
 	"github.com/denisbrodbeck/machineid"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/google/uuid"
 	"github.com/mata-elang-stable/snort3-parser/internal"
 	"github.com/nxadm/tail"
 	"golang.org/x/text/language"
@@ -161,6 +162,7 @@ func main() {
 
 				log.Printf("[STATS] Total=%d\tSuccess=%d\tFailed=%d\tAvgRate=%s message/second\n",
 					tempMessageCount, tempSuccessCount, tempErrorCount, p.Sprintf("%v", tempMessageRate))
+
 			case <-tickerLog.C:
 				files, err := filepath.Glob(fmt.Sprintf("%s.*", snortAlertFilePath))
 				if err != nil {
