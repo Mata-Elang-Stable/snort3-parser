@@ -14,7 +14,6 @@ import (
 
 	"github.com/denisbrodbeck/machineid"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/google/uuid"
 	"github.com/mata-elang-stable/snort3-parser/internal"
 	"github.com/nxadm/tail"
 	"golang.org/x/text/language"
