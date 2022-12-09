@@ -2,6 +2,10 @@
 
 Collect the Snort v3 alert log and send it to Mata Elang Defense Center through MQTT
 
+## Docker Hub Repository
+
+https://hub.docker.com/r/mataelang/snort3-parser
+
 ## Requirements
  - [Golang](https://go.dev/dl)
  - [make](https://www.gnu.org/software/make) (optional)
