@@ -14,43 +14,26 @@ import (
 
 	"github.com/denisbrodbeck/machineid"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/google/uuid"
 	"github.com/mata-elang-stable/snort3-parser/internal"
 	"github.com/nxadm/tail"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
 
-var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
-	log.Println("MQTT Client Connected.")
-}
-
-var connectionLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-	log.Printf("Connection Lost: %s\n", err.Error())
-}
-
 func main() {
 	machineID, err := machineid.ID()
 	if err != nil {
-		log.Println("Cannot get machine unique ID")
+		log.Println("[WARN] Cannot get machine unique ID, set machine-id to \"anonymous\"")
 		machineID = "anonymous"
 	}
-	appID := uuid.New()
 
 	var (
-		mqttBrokerHost     string
-		mqttBrokerPort     int
-		mqttBrokerUsername string
-		mqttBrokerPassword string
-		mqttTopic          string
-		snortAlertFilePath string
-		sensorID           string
-		mqttClientID       string
-		noCLI              = false
-		verboseLog         = false
-		successCount       = 0
-		messageCount       = 0
-		statsIntervalSec   = 10
+		mqttBrokerHost, mqttBrokerUsername, mqttBrokerPassword, mqttTopic string
+		sensorID, snortAlertFilePath                                      string
+		mqttBrokerPort                                                    int
+		noCLI, verboseLog                                                 = false, false
+		successCount, messageCount                                        = 0, 0
+		statsIntervalSec                                                  = 10
 	)
 
 	flag.StringVar(&mqttBrokerHost, "H", "127.0.0.1", "MQTT Broker Host")
@@ -98,44 +81,32 @@ func main() {
 	}
 
 	if snortAlertFilePath == "" {
-		log.Printf("Snort Alert Path cannot be null. Exiting.\n\n")
+		log.Printf("[ERROR] Snort Alert Path cannot be null. Exiting.\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	log.Printf("Loading configuration.")
+	log.Printf("[INFO] Loading configuration.")
 
 	sensorID = strings.ReplaceAll(sensorID, "<machine-id>", machineID)
 	mqttTopic = strings.ReplaceAll(mqttTopic, "<machine-id>", machineID)
 	mqttTopic = strings.ReplaceAll(mqttTopic, "<sensor-id>", sensorID)
-	mqttClientID = fmt.Sprintf("mataelang_sensor_parser_v3_%s", appID)
 
-	log.Printf("MQTT Broker Host\t\t: %s\n", mqttBrokerHost)
-	log.Printf("MQTT Broker Port\t\t: %d\n", mqttBrokerPort)
-	log.Printf("MQTT Broker Topic\t: %s\n", mqttTopic)
-	log.Printf("Snort Alert Path\t: %s\n", snortAlertFilePath)
+	log.Printf("[INFO] Sensor ID\t\t: %s\n", sensorID)
+	log.Printf("[INFO] MQTT Broker Host\t: %s\n", mqttBrokerHost)
+	log.Printf("[INFO] MQTT Broker Port\t: %d\n", mqttBrokerPort)
+	log.Printf("[INFO] MQTT Broker Topic\t: %s\n", mqttTopic)
+	log.Printf("[INFO] Snort Alert Path\t: %s\n", snortAlertFilePath)
 
-	log.Printf("Checking snort alert file is exist...\n")
+	log.Printf("[INFO] Checking snort alert file is exist...\n")
 	if _, err := os.Stat(snortAlertFilePath); errors.Is(err, os.ErrNotExist) {
-		log.Printf("\nSnort alert file at %s, does not exist.\n", snortAlertFilePath)
-		log.Fatalln("Cannot continue, exiting.")
+		log.Printf("[ERROR] The snort alert file at %s does not exist\n", snortAlertFilePath)
+		log.Fatalln("[ERROR] Cannot continue, exiting")
 	}
-	log.Printf("Snort alert file exist.\n")
+	log.Printf("[INFO] Snort alert file exist\n")
 
-	var broker = fmt.Sprintf("tcp://%s:%d", mqttBrokerHost, mqttBrokerPort)
-
-	options := mqtt.NewClientOptions()
-	options.AddBroker(broker)
-	options.SetClientID(mqttClientID)
-	if mqttBrokerUsername != "" {
-		options.SetUsername(mqttBrokerUsername)
-		options.SetPassword(mqttBrokerPassword)
-	}
-	options.OnConnect = connectHandler
-	options.OnConnectionLost = connectionLostHandler
-
-	client := mqtt.NewClient(options)
-	token := client.Connect()
+	var client mqtt.Client = internal.InitMQTT(mqttBrokerHost, mqttBrokerPort, mqttBrokerUsername, mqttBrokerPassword)
+	var token mqtt.Token = client.Connect()
 
 	if token.Wait() && token.Error() != nil {
 		log.Fatalln(token.Error())
@@ -150,7 +121,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	log.Printf("Start sending logs.")
+	log.Printf("[INFO] Start sending logs")
 
 	p := message.NewPrinter(language.AmericanEnglish)
 
@@ -180,13 +151,17 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				tempMessageCount := messageCount
-				tempSuccessCount := successCount
-				messageCount = 0
-				successCount = 0
+				tempMessageCount, tempSuccessCount := messageCount, successCount
+				messageCount, successCount = 0, 0
+				if successCount > messageCount {
+					messageCount = successCount
+				}
 				tempErrorCount := tempMessageCount - tempSuccessCount
 				tempMessageRate := tempMessageCount / statsIntervalSec
-				log.Printf("Total=%d\tSuccess=%d\tFailed=%d\tAvgRate=%s message/second\n", tempMessageCount, tempSuccessCount, tempErrorCount, p.Sprintf("%v", tempMessageRate))
+
+				log.Printf("[STATS] Total=%d\tSuccess=%d\tFailed=%d\tAvgRate=%s message/second\n",
+					tempMessageCount, tempSuccessCount, tempErrorCount, p.Sprintf("%v", tempMessageRate))
+
 			case <-tickerLog.C:
 				files, err := filepath.Glob(fmt.Sprintf("%s.*", snortAlertFilePath))
 				if err != nil {
@@ -218,7 +193,7 @@ func main() {
 		payload["sensor_id"] = sensorID
 
 		if verboseLog {
-			log.Printf("PAYLOAD - %s\n", fmt.Sprint(payload))
+			log.Printf("[DEBUG] PAYLOAD - %s\n", fmt.Sprint(payload))
 		}
 
 		messages <- payload
