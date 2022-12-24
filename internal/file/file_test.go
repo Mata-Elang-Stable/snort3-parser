@@ -136,18 +136,3 @@ func TestRemoveFiveFile(t *testing.T) {
 		removeTempFiles(tempFiles)
 	}
 }
-
-// func TestRemoveFiveFile(t *testing.T) {
-// 	_, err := createTempFiles(5, "test-*.json")
-// 	if err != nil {
-// 		t.Errorf(err.Error())
-// 	}
-
-// 	Remove("/tmp/test-*")
-
-// 	got := GetFileList("/tmp/test-*")
-
-// 	if len(got) > 0 {
-// 		t.Errorf("got %q, wanted []", got)
-// 	}
-// }
