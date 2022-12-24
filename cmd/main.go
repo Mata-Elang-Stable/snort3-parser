@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/denisbrodbeck/machineid"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/mata-elang-stable/snort3-parser/internal"
+	"github.com/mata-elang-stable/snort3-parser/internal/file"
 	"github.com/nxadm/tail"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -34,6 +34,8 @@ func main() {
 		noCLI, verboseLog                                                 = false, false
 		successCount, messageCount                                        = 0, 0
 		statsIntervalSec                                                  = 10
+		maxPCAPFiles                                                      = 55
+		snortLogPath = "/var/log/snort"
 	)
 
 	flag.StringVar(&mqttBrokerHost, "H", "127.0.0.1", "MQTT Broker Host")
@@ -42,10 +44,11 @@ func main() {
 	flag.StringVar(&mqttBrokerPassword, "p", "", "MQTT Broker Password")
 	flag.StringVar(&sensorID, "s", "<machine-id>", "Sensor ID")
 	flag.StringVar(&mqttTopic, "t", "mataelang/sensor/v3/<machine-id>", "MQTT Broker Topic")
-	flag.StringVar(&snortAlertFilePath, "f", "/var/log/snort/alert_json.txt", "Snort v3 JSON Log Alert File Path")
+	flag.StringVar(&snortAlertFilePath, "f", snortLogPath + "/alert_json.txt", "Snort v3 JSON Log Alert File Path")
 	flag.BoolVar(&noCLI, "b", false, "Wheter to use flag or environment variable")
 	flag.BoolVar(&verboseLog, "v", false, "Verbose payload to stdout")
 	flag.IntVar(&statsIntervalSec, "d", 10, "Log Statistics interval in second")
+	flag.IntVar(&maxPCAPFiles, "k", 55, "Number of PCAP files keeps on disk")
 	flag.Usage = func() {
 		flag.PrintDefaults()
 	}
@@ -54,7 +57,7 @@ func main() {
 	if noCLI {
 		snortAlertFilePath = os.Getenv("SNORT_ALERT_FILE_PATH")
 		if snortAlertFilePath == "" {
-			snortAlertFilePath = "/var/log/snort/alert_json.txt"
+			snortAlertFilePath = snortLogPath + "/alert_json.txt"
 		}
 		mqttBrokerHost = os.Getenv("MQTT_HOST")
 		mqttBrokerPort, err = strconv.Atoi(os.Getenv("MQTT_PORT"))
@@ -74,6 +77,11 @@ func main() {
 		if sensorID == "" {
 			sensorID = "<machine-id>"
 		}
+
+		maxPCAPFiles, err = strconv.Atoi(os.Getenv("MAX_PCAP_FILES"))
+		if err != nil {
+			log.Fatal("MAX_PCAP_FILES must be integer number.")
+		}
 	}
 
 	if _, err := internal.ValidatePort(mqttBrokerPort); err != nil {
@@ -88,6 +96,8 @@ func main() {
 
 	log.Printf("[INFO] Loading configuration.")
 
+	logPattern := fmt.Sprintf("%s.*", snortAlertFilePath)
+	pcapPattern := "log.pcap.*"
 	sensorID = strings.ReplaceAll(sensorID, "<machine-id>", machineID)
 	mqttTopic = strings.ReplaceAll(mqttTopic, "<machine-id>", machineID)
 	mqttTopic = strings.ReplaceAll(mqttTopic, "<sensor-id>", sensorID)
@@ -116,7 +126,7 @@ func main() {
 
 	// Create a tail process
 	t, err := tail.TailFile(
-		snortAlertFilePath, tail.Config{Follow: true})
+		snortAlertFilePath, tail.Config{ReOpen: true, Follow: true})
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -153,8 +163,8 @@ func main() {
 			case <-ticker.C:
 				tempMessageCount, tempSuccessCount := messageCount, successCount
 				messageCount, successCount = 0, 0
-				if successCount > messageCount {
-					messageCount = successCount
+				if tempSuccessCount > tempMessageCount {
+					tempMessageCount = tempSuccessCount
 				}
 				tempErrorCount := tempMessageCount - tempSuccessCount
 				tempMessageRate := tempMessageCount / statsIntervalSec
@@ -163,18 +173,20 @@ func main() {
 					tempMessageCount, tempSuccessCount, tempErrorCount, p.Sprintf("%v", tempMessageRate))
 
 			case <-tickerLog.C:
-				files, err := filepath.Glob(fmt.Sprintf("%s.*", snortAlertFilePath))
-				if err != nil {
-					log.Printf("[INFO] No rotated log file found.")
-					continue
+				// Remove rotated Snort Alert File
+				removeFiles := file.GetFileList(logPattern)
+				
+				// Remove rotated Snort PCAP File
+				pcapFiles := file.GetFileListSorted(snortLogPath + "/" + pcapPattern)
+				if len(pcapFiles) > maxPCAPFiles {
+					diff := len(pcapFiles) - maxPCAPFiles
+					pcapRemoveFiles := pcapFiles[:diff]
+					removeFiles = append(removeFiles, pcapRemoveFiles...)
 				}
-				for _, f := range files {
-					if err := os.Remove(f); err != nil {
-						log.Printf("[WARN] Cannot remove %s file", f)
-						continue
-					}
-					log.Printf("[INFO] File %s is removed.", f)
-				}
+
+				removedFiles := file.Removes(removeFiles)
+
+				log.Printf("[INFO] %d files is removed.", len(removedFiles))
 			case <-quit:
 				ticker.Stop()
 				return
