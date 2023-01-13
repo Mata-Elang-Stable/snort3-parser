@@ -24,11 +24,11 @@ build-linux:
 		GOOS=$(word 1,$(subst /, ,$(platform))) GOARCH=$(word 2,$(subst /, ,$(platform))) GO111MODULE=on CGO_ENABLED=0 $(GOCMD) build -o out/bin/$(BINARY_NAME)-$(word 1,$(subst /, ,$(platform)))-$(word 2,$(subst /, ,$(platform))) ./cmd/ ;\
 	)
 	
-build-docker-multiarch:
+build-docker-multiarch: ## Build Docker Image then push to Docker Hub repository
 	@echo "[INFO] Building docker image for platform: $(TARGET_PLATFORMS)"
 	@docker buildx build --platform $(subst $(space),$(comma),$(TARGET_PLATFORMS)) -t $(DOCKER_REPO_URL):latest -t $(DOCKER_REPO_URL):$(VERSION) --push .
 
-build-docker:
+build-docker-image: ## Build Docker Image locally
 	@echo "[INFO] Building docker image"
 	@echo "[INFO] Docker image name: snort3-parser"
 	@docker build -t snort3-parser .

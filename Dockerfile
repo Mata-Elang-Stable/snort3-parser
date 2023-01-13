@@ -9,7 +9,7 @@ RUN go mod download
 
 COPY . /app/
 
-RUN GOOS=linux GOARCH=${BUILDPLATFORM} GO111MODULE=on CGO_ENABLED=0 go build -o me-snort3-parser ./cmd/
+RUN GOOS=linux GO111MODULE=on CGO_ENABLED=0 go build -o me-snort3-parser ./cmd/
 
 FROM scratch
 
