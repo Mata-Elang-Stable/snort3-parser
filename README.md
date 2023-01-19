@@ -16,7 +16,3 @@ https://hub.docker.com/r/mataelang/snort3-parser
  - Build the binary: `make build`.
     The binary will be available in the `out/bin/` directory.
  - Build docker image: `make build-docker`
-
-## Running with the go command
- - `go mod download`
- - `go run main.go`
