@@ -7,7 +7,7 @@ Collect the Snort v3 alert log and send it to Mata Elang Defense Center through 
 https://hub.docker.com/r/mataelang/snort3-parser
 
 ## Requirements
- - [Golang](https://go.dev/dl)
+ - [Golang 1.18 or more](https://go.dev/dl)
  - [make](https://www.gnu.org/software/make) (optional)
  - [Docker](https://docs.docker.com/engine) (optional)
 
@@ -16,7 +16,3 @@ https://hub.docker.com/r/mataelang/snort3-parser
  - Build the binary: `make build`.
     The binary will be available in the `out/bin/` directory.
  - Build docker image: `make build-docker`
-
-## Running with the go command
- - `go mod download`
- - `go run main.go`
